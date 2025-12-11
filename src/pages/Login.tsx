@@ -10,23 +10,39 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();         
-    setLoading(true);
-    setError("");
+ const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();         
+  setLoading(true);
+  setError("");
 
-    try {
-        
-      const data = await loginService(username, password);
-     
-      login(data.token, data.user);
-      window.location.href = "/dashboard";
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
+  console.log("=== LOGIN STARTED ===");
+  console.log("Username:", username);
+
+  try {
+    console.log("Calling loginService...");
+    const data = await loginService(username, password);
+    
+    console.log("=== LOGIN RESPONSE ===");
+    console.log("Full data received:", data);
+    console.log("Token:", data.token);
+    console.log("Token type:", typeof data.token);
+    console.log("Token is undefined?", data.token === undefined);
+    console.log("User:", data.user);
+    
+    console.log("Calling login function...");
+    login(data.token, data.user);
+    
+    console.log("Token stored in localStorage:", localStorage.getItem("accessToken"));
+    
+    window.location.href = "/dashboard";
+  } catch (err: any) {
+    console.error("=== LOGIN ERROR ===");
+    console.error("Error:", err);
+    setError(err.response?.data?.message || "Login failed");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="h-screen w-full flex justify-center items-center bg-linear-to-br from-blue-50 via-white to-indigo-100">

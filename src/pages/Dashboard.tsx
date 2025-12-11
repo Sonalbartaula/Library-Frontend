@@ -1,58 +1,25 @@
-import { useEffect, useState } from "react";
+
+
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import PopularBooks from "../components/sections/PopularBooks";
 import RecentActivity from "../components/sections/RecentActivity";
-import { getFullDashboardData } from "../services/dashboardServices";
 import { BookOpen, Users, BookMarked, AlertTriangle } from "lucide-react";
 
-interface DashboardData {
-  totalBooks: number;
-  activeMembers: number;
-  booksIssued: number;
-  overdueBooks: number;
-  booksAddedThisMonth: number;
-  membersJoinedThisMonth: number;
-  dueSoonCount: number;
-  remindersSent: number;
-  recentActivities: any[];
-  popularBooks: any[];
-}
+
+import type { AppDispatch } from "../features/store";
+import { fetchDashboardData } from "../features/dashboard/dashboardThunk";
+import { selectDashboardData, selectDashboardError, selectDashboardLoading } from "../features/dashboard/dashboardSlice";
 
 const Dashboard = () => {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useDispatch<AppDispatch>();
+  const data = useSelector(selectDashboardData);
+  const loading = useSelector(selectDashboardLoading);
+  const error = useSelector(selectDashboardError);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await getFullDashboardData();
-
-        console.log("Dashboard API Response:", res);
-
-        setData({
-          totalBooks: res.totalBooks ?? 0,
-          activeMembers: res.activeMembers ?? 0,
-          booksIssued: res.booksIssued ?? 0,
-          overdueBooks: res.overdueBooks ?? 0,
-          booksAddedThisMonth: res.booksAddedThisMonth ?? 0,
-          membersJoinedThisMonth: res.membersJoinedThisMonth ?? 0,
-          dueSoonCount: res.dueSoonCount ?? 0,
-          remindersSent: res.remindersSent ?? 0,
-          recentActivities: Array.isArray(res.recentActivities) ? res.recentActivities : [],
-          popularBooks: Array.isArray(res.popularBooks) ? res.popularBooks : [],
-        });
-      } catch (err: any) {
-        console.error("Failed to load dashboard:", err);
-        setError(err.response?.data?.message || "Failed to load dashboard data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
+    dispatch(fetchDashboardData());
+  }, [dispatch]);
 
   if (loading) {
     return (
@@ -94,7 +61,7 @@ const Dashboard = () => {
   return (
     <div className="p-6 space-y-8">
       {/* Header */}
-      <div >
+      <div>
         <h1 className="text-3xl font-bold text-gray-900">Library Dashboard</h1>
         <p className="text-gray-600 mt-1">Welcome to the Library Management System</p>
       </div>

@@ -1,4 +1,4 @@
-// src/services/dashboardServices.ts
+
 import api from "../api/authInstance";
 
 // Single, fast, beautiful call — everything in one go

@@ -1,7 +1,10 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { LayoutDashboard, BookOpen, Users, Receipt, ClipboardList, LogOut, Book } from "lucide-react";
 
+
+
 export default function Sidebar() {
+  const navigate = useNavigate();
   return (
     <div className="h-screen w-64 bg-white text-black flex flex-col shadow-2xl">
      <div className="h-20 w-full bg-[#3D89D6] flex items-center px-6 text-xl font-bold gap-3">
@@ -65,7 +68,8 @@ export default function Sidebar() {
         </NavLink>
       </nav>
       <div className="p-4 mb-4">
-        <button className="w-full flex items-center justify-center gap-2 p-3 bg-white-600 hover:bg-[#3D89D6] hover:text-white rounded-lg">
+        <button onClick={() => navigate("/login")}
+        className="w-full flex items-center justify-center gap-2 p-3 bg-white-600 hover:bg-[#3D89D6] hover:text-white rounded-lg">
         <LogOut size={20} /> Logout
         </button>
         </div>

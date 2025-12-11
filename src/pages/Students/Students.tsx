@@ -1,31 +1,24 @@
-// src/pages/Students.tsx
+
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { Eye, Edit, Trash2 } from "lucide-react";
-import axios from "axios";
-
-interface Student {
-  id: number;
-  name: string;           // ← "name", not "memberName"
-  contact: string;
-  type: number;           // ← 0 = Student, 1 = Faculty, etc.
-  status: number;         // ← 0=Active, 1=Inactive, 2=Suspended (adjust below)
-  booksIssued: number;
-  joinedDate: string;     // ISO string
-  overdueBooks: number;
-}
+import { fetchStudents, deleteStudentAsync } from "../../features/students/studentsThunk";
+import type { RootState, AppDispatch } from "../../features/store";
 
 const Students = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Redux state
+  const { students, loading, error } = useSelector((state: RootState) => state.students);
 
+  // Local filters & pagination
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteLoading, setDeleteLoading] = useState<number | null>(null);
   const pageSize = 7;
 
   // Reset page when filters change
@@ -33,22 +26,10 @@ const Students = () => {
     setCurrentPage(1);
   }, [search, typeFilter, statusFilter]);
 
-  // Fetch students from your real endpoint
+  // Fetch students from Redux
   useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get<Student[]>("https://localhost:7281/api/Student/GetAll");
-        setStudents(response.data);
-      } catch (err) {
-        console.error("Failed to load members:", err);
-        setError("Failed to load members. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStudents();
-  }, []);
+    dispatch(fetchStudents());
+  }, [dispatch]);
 
   // Helper functions
   const getTypeLabel = (type: number) => {
@@ -99,13 +80,34 @@ const Students = () => {
 
   const totalPages = Math.ceil(filteredStudents.length / pageSize);
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Delete this member permanently?")) return;
+  const handleDelete = async (id: number, name: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${name}"?\n\nThis action cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+    
+    setDeleteLoading(id);
+    
     try {
-      await axios.delete(`https://localhost:7281/api/Student/Delete/${id}`);
-      setStudents(prev => prev.filter(s => s.id !== id));
-    } catch (err) {
-      alert("Failed to delete member");
+      await dispatch(deleteStudentAsync(id)).unwrap();
+      
+      // Show success message
+      alert(`✓ Member "${name}" has been deleted successfully!`);
+      
+      
+      if (paginatedStudents.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
+    } catch (err: any) {
+      console.error("Delete error:", err);
+      alert(
+        `✗ Failed to delete member "${name}"\n\n` +
+        `Error: ${err.message || 'Unknown error occurred'}\n\n` +
+        `Please try again or contact support if the problem persists.`
+      );
+    } finally {
+      setDeleteLoading(null);
     }
   };
 
@@ -118,7 +120,7 @@ const Students = () => {
           <p className="text-gray-600">Manage library members and borrowing status</p>
         </div>
         <button
-          onClick={() => navigate("/AddMember")}
+          onClick={() => navigate("/addstudent")}
           className="bg-[#3D89D6] hover:bg-[#326bb0] text-white px-6 py-3 rounded-lg font-medium transition"
         >
           + Add Member
@@ -163,7 +165,7 @@ const Students = () => {
       </div>
 
       {/* Loading / Error */}
-      {loading && (
+      {loading && !deleteLoading && (
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <p className="text-gray-500">Loading members...</p>
         </div>
@@ -202,8 +204,10 @@ const Students = () => {
                 ) : (
                   paginatedStudents.map((s) => {
                     const statusInfo = getStatusLabel(s.status);
+                    const isDeleting = deleteLoading === s.id;
+                    
                     return (
-                      <tr key={s.id} className="hover:bg-gray-50">
+                      <tr key={s.id} className={`hover:bg-gray-50 ${isDeleting ? 'opacity-50' : ''}`}>
                         <td className="px-6 py-4 font-medium">{s.name}</td>
                         <td className="px-6 py-4 text-gray-700">{s.contact}</td>
                         <td className="px-6 py-4">
@@ -225,9 +229,27 @@ const Students = () => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex justify-center gap-3">
-                            <button className="text-gray-600 hover:text-blue-600"><Eye size={19} /></button>
-                            <button onClick={() => navigate(`/edit-member/${s.id}`)} className="text-gray-600 hover:text-yellow-600"><Edit size={19} /></button>
-                            <button onClick={() => handleDelete(s.id)} className="text-gray-600 hover:text-red-600"><Trash2 size={19} /></button>
+                            <button 
+                              className="text-gray-600 hover:text-blue-600 transition"
+                              disabled={isDeleting}
+                            >
+                              <Eye size={19} />
+                            </button>
+                            <button 
+                              onClick={() => navigate(`/edit-student/${s.id}`)} 
+                              className="text-gray-600 hover:text-yellow-600 transition"
+                              disabled={isDeleting}
+                            >
+                              <Edit size={19} />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(s.id, s.name)} 
+                              className="text-gray-600 hover:text-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={isDeleting}
+                              title={isDeleting ? "Deleting..." : "Delete member"}
+                            >
+                              <Trash2 size={19} className={isDeleting ? "animate-pulse" : ""} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -239,36 +261,62 @@ const Students = () => {
 
             {/* Mobile Cards */}
             <div className="lg:hidden space-y-4 p-4">
-              {paginatedStudents.map((s) => {
-                const statusInfo = getStatusLabel(s.status);
-                return (
-                  <div key={s.id} className="border rounded-lg p-5 bg-white shadow-sm hover:shadow-md transition">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="font-semibold text-lg">{s.name}</h3>
-                        <p className="text-sm text-gray-600">{s.contact}</p>
+              {paginatedStudents.length === 0 ? (
+                <p className="text-center py-16 text-gray-500">No members found.</p>
+              ) : (
+                paginatedStudents.map((s) => {
+                  const statusInfo = getStatusLabel(s.status);
+                  const isDeleting = deleteLoading === s.id;
+                  
+                  return (
+                    <div 
+                      key={s.id} 
+                      className={`border rounded-lg p-5 bg-white shadow-sm hover:shadow-md transition ${isDeleting ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-semibold text-lg">{s.name}</h3>
+                          <p className="text-sm text-gray-600">{s.contact}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            className="text-gray-600 hover:text-blue-600 transition"
+                            disabled={isDeleting}
+                          >
+                            <Eye size={18} />
+                          </button>
+                          <button 
+                            onClick={() => navigate(`/edit-student/${s.id}`)} 
+                            className="text-gray-600 hover:text-yellow-600 transition"
+                            disabled={isDeleting}
+                          >
+                            <Edit size={18} />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(s.id, s.name)} 
+                            className="text-gray-600 hover:text-red-600 transition disabled:opacity-50"
+                            disabled={isDeleting}
+                          >
+                            <Trash2 size={18} className={isDeleting ? "animate-pulse" : ""} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button className="text-gray-600 hover:text-blue-600"><Eye size={18} /></button>
-                        <button onClick={() => navigate(`/edit-member/${s.id}`)} className="text-gray-600 hover:text-yellow-600"><Edit size={18} /></button>
-                        <button onClick={() => handleDelete(s.id)} className="text-gray-600 hover:text-red-600"><Trash2 size={18} /></button>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div><span className="text-gray-500">Type:</span> <span className="font-medium">{getTypeLabel(s.type)}</span></div>
+                        <div><span className="text-gray-500">Status:</span> <span className={`ml-2 font-medium ${statusInfo.color.includes('green') ? 'text-green-600' : statusInfo.color.includes('red') ? 'text-red-600' : 'text-gray-600'}`}>{statusInfo.label}</span></div>
+                        <div><span className="text-gray-500">Joined:</span> <span className="font-medium">{formatDate(s.joinedDate)}</span></div>
+                        <div><span className="text-gray-500">Issued:</span> <span className="font-medium">{s.booksIssued}</span></div>
+                        <div className="col-span-2">
+                          <span className="text-gray-500">Overdue:</span>
+                          <span className={`ml-2 font-bold text-lg ${s.overdueBooks > 0 ? "text-red-600" : "text-green-600"}`}>
+                            {s.overdueBooks}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div><span className="text-gray-500">Type:</span> <span className="font-medium">{getTypeLabel(s.type)}</span></div>
-                      <div><span className="text-gray-500">Status:</span> <span className={`ml-2 font-medium ${statusInfo.color.includes('green') ? 'text-green-600' : statusInfo.color.includes('red') ? 'text-red-600' : 'text-gray-600'}`}>{statusInfo.label}</span></div>
-                      <div><span className="text-gray-500">Joined:</span> <span className="font-medium">{formatDate(s.joinedDate)}</span></div>
-                      <div><span className="text-gray-500">Issued:</span> <span className="font-medium">{s.booksIssued}</span></div>
-                      <div className="col-span-2">
-                        <span className="text-gray-500">Overdue:</span>
-                        <span className={`ml-2 font-bold text-lg ${s.overdueBooks > 0 ? "text-red-600" : "text-green-600"}`}>
-                          {s.overdueBooks}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -279,17 +327,19 @@ const Students = () => {
             </p>
             <div className="flex items-center gap-2">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                className="px-4 py-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50">
+                className="px-4 py-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition">
                 ← Previous
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <button key={page} onClick={() => setCurrentPage(page)}
-                  className={`px-4 py-2 rounded-lg border ${page === currentPage ? "bg-[#3D89D6] text-white" : "hover:bg-gray-100"}`}>
-                  {page}
-                </button>
-              ))}
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                className="px-4 py-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50">
+              <div className="flex flex-wrap justify-center gap-2">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button key={page} onClick={() => setCurrentPage(page)}
+                    className={`px-4 py-2 rounded-lg border transition ${page === currentPage ? "bg-[#3D89D6] text-white border-[#3D89D6]" : "hover:bg-gray-100"}`}>
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition">
                 Next →
               </button>
             </div>

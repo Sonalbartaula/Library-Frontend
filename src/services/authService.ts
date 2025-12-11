@@ -1,13 +1,22 @@
 import api from "../api/authInstance";
 
-
 export const loginService = async (username: string, password: string) => {
-  const response = await api.post("/Auth/Login", {
-    username,
-    password,
-  });
+  const response = await api.post("/Auth/Login", { username, password });
 
-  return response.data; // expects { token, user }
+  console.log("=== AUTH SERVICE - AFTER API CALL ===");
+  console.log("Full axios response:", response);
+  console.log("Response.data:", response.data);
+
+  const token = response.data.accessToken;
+  const refreshToken = response.data.refreshToken;
+
+  console.log("Mapped token:", token);
+
+  return {
+    token,
+    refreshToken,
+    user: response.data.user ?? null
+  };
 };
 
 export const registerService = async (body: any) => {

@@ -1,27 +1,18 @@
-// src/pages/Books.tsx
+
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { Eye, Edit, Trash2 } from "lucide-react";
-import axios from "axios";
+import type { AppDispatch, RootState } from "../../features/store";
+import { deleteBookAsync, fetchBooks } from "../../features/books/bookThunk";
 
-interface Book {
-  id: number;
-  title: string;
-  author: string;
-  isbn: string;
-  categories: string;
-  status: "available" | "notavailable";
-  totalCopies: number;
-  issuedCopies: number;
-}
 
 const Books = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
 
-  // State
-  const [books, setBooks] = useState<Book[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Redux state
+  const { books, loading, error } = useSelector((state: RootState) => state.books);
 
   // Filters & Pagination
   const [search, setSearch] = useState("");
@@ -41,24 +32,10 @@ const Books = () => {
     return cats.sort();
   }, [books]);
 
-  // Fetch books
+  // Fetch books from Redux
   useEffect(() => {
-    const fetchBooks = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get<Book[]>("https://localhost:7281/api/Book/Books");
-        setBooks(response.data);
-        setError(null);
-      } catch (err: any) {
-        console.error("Failed to fetch books:", err);
-        setError("Failed to load books. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBooks();
-  }, []);
+    dispatch(fetchBooks());
+  }, [dispatch]);
 
   // Filtered books
   const filteredBooks = useMemo(() => {
@@ -72,8 +49,8 @@ const Books = () => {
 
       const matchesStatus =
         status === "all" ||
-        (status === "available" && book.status === "available") ||
-        (status === "notavailable" && book.status === "notavailable");
+        (status === "available" && book.status === 1) ||
+        (status === "notavailable" && book.status === 0);
 
       return matchesSearch && matchesCategory && matchesStatus;
     });
@@ -93,8 +70,7 @@ const Books = () => {
     if (!window.confirm("Are you sure you want to delete this book?")) return;
 
     try {
-      await axios.delete(`https://localhost:7281/api/Book/DeleteBooks/${id}`);
-      setBooks((prev) => prev.filter((book) => book.id !== id));
+      await dispatch(deleteBookAsync(id)).unwrap();
     } catch (err) {
       alert("Failed to delete book");
     }
@@ -205,12 +181,12 @@ const Books = () => {
                       <td className="px-6 py-4">
                         <span
                           className={`px-3 py-1 text-xs font-medium rounded-full ${
-                            book.status === "available"
+                            book.status === 1
                               ? "bg-green-100 text-green-800"
                               : "bg-red-100 text-red-800"
                           }`}
                         >
-                          {book.status === "available" ? "Available" : "Not Available"}
+                          {book.status === 1 ? "Available" : "Not Available"}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">{book.totalCopies}</td>
@@ -280,12 +256,12 @@ const Books = () => {
                         Status:{" "}
                         <span
                           className={`px-2 py-1 text-xs rounded-full font-medium ${
-                            book.status === "available"
+                            book.status === 1
                               ? "bg-green-100 text-green-800"
                               : "bg-red-100 text-red-800"
                           }`}
                         >
-                          {book.status === "available" ? "Available" : "Not Available"}
+                          {book.status === 1 ? "Available" : "Not Available"}
                         </span>
                       </p>
                       <p>Copies: <span className="font-medium">{book.totalCopies}</span></p>
@@ -297,7 +273,7 @@ const Books = () => {
             </div>
           </div>
 
-          {/* Pagination - Single & Clean */}
+          {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 bg-gray-50 border-t gap-4">
             <p className="text-sm text-gray-700">
               Showing <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> to{" "}
