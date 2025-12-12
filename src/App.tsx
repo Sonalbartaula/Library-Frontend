@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Provider } from "react-redux";
 import { AuthProvider } from "./context/authContext";
 import { store } from "./features/store";
@@ -22,13 +22,14 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
 
             {/* Auth pages - WITHOUT sidebar */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
             {/* Pages that use sidebar */}
-            <Route path="/" element={<DashboardLayout />}>
+            <Route path="/app" element={<DashboardLayout />}>
               <Route index element={<Dashboard />} />        
               <Route path="dashboard" element={<Dashboard />} />
 

@@ -1,5 +1,6 @@
 export interface CheckoutRequest {
-  memberId: string;
+  memberName: string;
+  bookTitle: string;
   isbn: string;
 }
 
@@ -8,10 +9,11 @@ export interface Transaction {
   memberName: string;
   memberNumber: string;
   bookTitle: string;
+  bookName:string,
   isbn: string;
   checkoutDate: string;
   dueDate: string;
-  returnDate: string | null;
+  returnDate: string ;
   computedStatus: 'Active' | 'Overdue' | 'Returned';
   timeLeft: string;
   fine: number;

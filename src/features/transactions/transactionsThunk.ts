@@ -10,9 +10,9 @@ export const checkoutBook = createAsyncThunk<Transaction, CheckoutRequest>(
   }
 );
 
-export const returnBook = createAsyncThunk<Transaction, string>(
+export const returnBook = createAsyncThunk<Transaction, { isbn: string; memberName: string }>(
   'transactions/return',
-  async (isbn) => {
+  async ({ isbn}) => {
     return await transactionsRepository.returnBook(isbn);
   }
 );

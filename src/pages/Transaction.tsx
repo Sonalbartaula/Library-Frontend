@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -22,7 +21,6 @@ const BookCheckout: React.FC = () => {
   const [bookIsbn, setBookIsbn] = useState('');
   const [action, setAction] = useState('Book Checkout');
 
-  // Clear messages when component unmounts
   useEffect(() => {
     return () => {
       dispatch(clearError());
@@ -30,37 +28,64 @@ const BookCheckout: React.FC = () => {
     };
   }, [dispatch]);
 
-  const handleProcessTransaction = async () => {
-    // Validation
-    if (!memberId.trim() || !bookIsbn.trim()) {
-      alert('Please enter both Member ID and Book ISBN');
-      return;
-    }
+ const handleProcessTransaction = async () => {
+  dispatch(clearError());
+  dispatch(clearSuccessMessage());
 
-    try {
-      if (action === 'Book Checkout') {
-        await dispatch(checkoutBook({
-          memberId: memberId.trim(),
-          isbn: bookIsbn.trim()
-        })).unwrap();
-      } else {
-        await dispatch(returnBook(bookIsbn.trim())).unwrap();
-      }
+  if (!memberId.trim() || !bookIsbn.trim()) {
+    alert('Please enter both Member ID and Book ISBN');
+    return;
+  }
 
-      // Reset form on success
-      setMemberId('');
-      setBookIsbn('');
-    } catch (err: any) {
-      // Error is already handled by Redux
-      console.error('Transaction error:', err);
+  try {
+    if (action === 'Book Checkout') {
+      const result = await dispatch(checkoutBook({
+        memberName: memberId.trim(),
+        bookTitle: bookIsbn.trim(),
+        isbn: bookIsbn.trim()
+      })).unwrap();
+      
+      console.log('Checkout successful:', result);
+    } else { 
+      // Book Return - FIXED: Added .unwrap()
+      const result = await dispatch(returnBook({ 
+        isbn: bookIsbn.trim(), 
+        memberName: memberId.trim() 
+      })).unwrap();
+      
+      console.log('Return successful:', result);
     }
-  };
+    
+    // Common cleanup after both actions
+    setMemberId('');
+    setBookIsbn('');
+    dispatch(fetchActiveLoans());
+    
+    // Refresh history only for returns
+    if (action === 'Book Return') {
+      dispatch(fetchHistory());
+    }
+  } catch (err: any) {
+    console.error('Transaction error:', err);
+    // Error will be shown in the error banner automatically
+    // But also show alert for immediate feedback
+    if (!error) {
+      alert(err?.message || err || 'Transaction failed. Please try again.');
+    }
+  }
+};
 
   const handleResetForm = () => {
     setMemberId('');
     setBookIsbn('');
     dispatch(clearError());
     dispatch(clearSuccessMessage());
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !loading) {
+      handleProcessTransaction();
+    }
   };
 
   return (
@@ -73,14 +98,12 @@ const BookCheckout: React.FC = () => {
         </div>
       </div>
 
-      {/* Error Alert */}
       {error && (
         <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-600 font-medium">{error}</p>
         </div>
       )}
 
-      {/* Success Alert */}
       {successMessage && (
         <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
           <p className="text-green-600 font-medium">{successMessage}</p>
@@ -97,6 +120,7 @@ const BookCheckout: React.FC = () => {
               type="text"
               value={memberId}
               onChange={(e) => setMemberId(e.target.value)}
+              onKeyPress={handleKeyPress}
               placeholder="Enter member ID or search by name...."
               disabled={loading}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -111,6 +135,7 @@ const BookCheckout: React.FC = () => {
               type="text"
               value={bookIsbn}
               onChange={(e) => setBookIsbn(e.target.value)}
+              onKeyPress={handleKeyPress}
               placeholder="Enter ISBN or search by title...."
               disabled={loading}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -135,9 +160,9 @@ const BookCheckout: React.FC = () => {
           <div className="flex gap-3 pt-4">
             <button
               onClick={handleProcessTransaction}
-              disabled={loading}
+              disabled={loading || !memberId.trim() || !bookIsbn.trim()}
               className={`px-6 py-2 bg-black text-white rounded-md hover:bg-gray-800 transition-colors ${
-                loading ? 'opacity-50 cursor-not-allowed' : ''
+                loading || !memberId.trim() || !bookIsbn.trim() ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
               {loading ? 'Processing...' : 'Process Transaction'}
@@ -188,9 +213,10 @@ const ActiveLoans: React.FC = () => {
       const search = searchActive.toLowerCase();
       filtered = filtered.filter(
         (loan) =>
-          loan.memberName.toLowerCase().includes(search) ||
-          loan.bookTitle.toLowerCase().includes(search) ||
-          loan.isbn.toLowerCase().includes(search)
+          loan.memberName?.toLowerCase().includes(search) ||
+          loan.bookTitle?.toLowerCase().includes(search) ||
+          loan.bookName?.toLowerCase().includes(search) ||
+          loan.isbn?.toLowerCase().includes(search)
       );
     }
 
@@ -202,20 +228,43 @@ const ActiveLoans: React.FC = () => {
   }, [activeLoans, searchActive, statusFilter]);
 
   const handleRenew = async (isbn: string) => {
+    dispatch(clearError());
+    dispatch(clearSuccessMessage());
+    
     try {
       setRenewLoading(isbn);
-      await dispatch(renewBook(isbn)).unwrap();
+      const result = await dispatch(renewBook(isbn)).unwrap();
+      console.log('Renew successful:', result);
       alert('Book renewed successfully!');
+      await dispatch(fetchActiveLoans());
     } catch (err: any) {
-      alert(err.message || 'Failed to renew book');
+      console.error('Renew error:', err);
+      const errorMessage = err?.message || err || 'Failed to renew book. Please try again.';
+      alert(errorMessage);
     } finally {
       setRenewLoading(null);
     }
   };
 
-  const getDaysLeft = (timeLeft: string) => {
-    if (timeLeft === 'Returned') return 0;
-    return parseInt(timeLeft) || 0;
+  const parseDaysLeft = (timeLeftStr: string): number => {
+    if (!timeLeftStr) return 0;
+    
+    // Parse "7 days left" or "-5 days" format
+    const match = timeLeftStr.match(/(-?\d+)/);
+    if (match) {
+      return parseInt(match[1]);
+    }
+    return 0;
+  };
+
+  const formatDate = (dateStr: string): string => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
   };
 
   const getStatusColor = (status: string): string => {
@@ -249,7 +298,6 @@ const ActiveLoans: React.FC = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <Clock className="w-6 h-6 text-gray-700" />
@@ -258,7 +306,6 @@ const ActiveLoans: React.FC = () => {
         <p className="text-gray-500 text-sm">Currently checked out books and their due dates</p>
       </div>
 
-      {/* Search and Filter */}
       <div className="flex gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -282,7 +329,6 @@ const ActiveLoans: React.FC = () => {
         </select>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -292,7 +338,7 @@ const ActiveLoans: React.FC = () => {
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Checkout Date</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Due Date</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Days Left</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Time Left</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Action</th>
             </tr>
           </thead>
@@ -307,29 +353,33 @@ const ActiveLoans: React.FC = () => {
               </tr>
             ) : (
               filteredLoans.map((loan) => {
-                const daysLeft = getDaysLeft(loan.timeLeft || '0');
+                const daysLeft = parseDaysLeft(loan.timeLeft || '0');
+                const displayName = loan.memberName || 'Unknown';
+                const bookTitle = loan.bookTitle || loan.bookName || 'Unknown';
+                
                 return (
                   <tr key={loan.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-700">
-                          {loan.memberName
+                          {displayName
                             .split(' ')
                             .map((n: string) => n[0])
-                            .join('')}
+                            .join('')
+                            .toUpperCase()}
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">{loan.memberName}</div>
-                          <div className="text-sm text-gray-500">{loan.memberNumber || '-'}</div>
+                          <div className="font-medium text-gray-900">{displayName}</div>
+                          <div className="text-sm text-gray-500">ID: {loan.id}</div>
                         </div>
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <div className="font-medium text-gray-900">{loan.bookTitle}</div>
-                      <div className="text-sm text-gray-500">{loan.isbn}</div>
+                      <div className="font-medium text-gray-900">{bookTitle}</div>
+                      <div className="text-sm text-gray-500">ISBN: {loan.isbn}</div>
                     </td>
-                    <td className="py-4 px-4 text-gray-600">{loan.checkoutDate}</td>
-                    <td className="py-4 px-4 text-gray-600">{loan.dueDate}</td>
+                    <td className="py-4 px-4 text-gray-600">{formatDate(loan.checkoutDate)}</td>
+                    <td className="py-4 px-4 text-gray-600">{formatDate(loan.dueDate)}</td>
                     <td className="py-4 px-4">
                       <span
                         className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
@@ -346,21 +396,17 @@ const ActiveLoans: React.FC = () => {
                         ) : (
                           <Clock className="w-4 h-4 text-yellow-500" />
                         )}
-                        <span
-                          className={
-                            daysLeft < 0 ? 'text-red-600 font-medium' : 'text-yellow-600 font-medium'
-                          }
-                        >
-                          {Math.abs(daysLeft)} Day{Math.abs(daysLeft) !== 1 ? 's' : ''}{' '}
-                          {daysLeft < 0 ? 'Overdue' : 'Left'}
+                        <span className={daysLeft < 0 ? 'text-red-600 font-medium' : 'text-yellow-600 font-medium'}>
+                          {loan.timeLeft || 'Unknown'}
                         </span>
                       </div>
                     </td>
                     <td className="py-4 px-4 text-center">
                       <button
                         onClick={() => handleRenew(loan.isbn)}
-                        disabled={renewLoading === loan.isbn}
+                        disabled={renewLoading === loan.isbn || loan.computedStatus === 'Returned'}
                         className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        title={loan.computedStatus === 'Returned' ? 'Cannot renew returned books' : 'Renew this loan'}
                       >
                         {renewLoading === loan.isbn ? 'Renewing...' : 'Renew'}
                       </button>
@@ -395,9 +441,10 @@ const TransactionHistory: React.FC = () => {
       const search = searchHistory.toLowerCase();
       filtered = filtered.filter(
         (txn) =>
-          txn.memberName.toLowerCase().includes(search) ||
-          txn.bookTitle.toLowerCase().includes(search) ||
-          txn.isbn.toLowerCase().includes(search)
+          txn.memberName?.toLowerCase().includes(search) ||
+          txn.bookTitle?.toLowerCase().includes(search) ||
+          txn.bookName?.toLowerCase().includes(search) ||
+          txn.isbn?.toLowerCase().includes(search)
       );
     }
 
@@ -407,6 +454,16 @@ const TransactionHistory: React.FC = () => {
 
     return filtered;
   }, [history, searchHistory, transactionFilter]);
+
+  const formatDate = (dateStr: string): string => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
 
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -439,7 +496,6 @@ const TransactionHistory: React.FC = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <FileText className="w-6 h-6 text-gray-700" />
@@ -448,7 +504,6 @@ const TransactionHistory: React.FC = () => {
         <p className="text-gray-500 text-sm">Complete history of all book transactions</p>
       </div>
 
-      {/* Search and Filter */}
       <div className="flex gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -472,7 +527,6 @@ const TransactionHistory: React.FC = () => {
         </select>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -496,43 +550,48 @@ const TransactionHistory: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              filteredHistory.map((txn) => (
-                <tr key={txn.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-4 px-4">
-                    <span className="font-mono text-sm text-gray-700">#{txn.id}</span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-700">
-                        {txn.memberName
-                          .split(' ')
-                          .map((n: string) => n[0])
-                          .join('')}
+              filteredHistory.map((txn) => {
+                const displayName = txn.memberName || 'Unknown';
+                const bookTitle = txn.bookTitle || txn.bookName || 'Unknown';
+                
+                return (
+                  <tr key={txn.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-4 px-4">
+                      <span className="font-mono text-sm text-gray-700">#{txn.id}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-700">
+                          {displayName
+                            .split(' ')
+                            .map((n: string) => n[0])
+                            .join('')
+                            .toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{displayName}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-medium text-gray-900">{txn.memberName}</div>
-                        <div className="text-sm text-gray-500">{txn.memberNumber || '-'}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="font-medium text-gray-900">{txn.bookTitle}</div>
-                    <div className="text-sm text-gray-500">{txn.isbn}</div>
-                  </td>
-                  <td className="py-4 px-4 text-gray-600">{txn.checkoutDate}</td>
-                  <td className="py-4 px-4 text-gray-600">{txn.dueDate}</td>
-                  <td className="py-4 px-4 text-gray-600">{txn.returnDate || '-'}</td>
-                  <td className="py-4 px-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                        txn.computedStatus
-                      )}`}
-                    >
-                      {txn.computedStatus}
-                    </span>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="font-medium text-gray-900">{bookTitle}</div>
+                      <div className="text-sm text-gray-500">ISBN: {txn.isbn}</div>
+                    </td>
+                    <td className="py-4 px-4 text-gray-600">{formatDate(txn.checkoutDate)}</td>
+                    <td className="py-4 px-4 text-gray-600">{formatDate(txn.dueDate)}</td>
+                    <td className="py-4 px-4 text-gray-600">{formatDate(txn.returnDate)}</td>
+                    <td className="py-4 px-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                          txn.computedStatus
+                        )}`}
+                      >
+                        {txn.computedStatus}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -558,13 +617,13 @@ const Transaction: React.FC = () => {
   const handleTabChange = (tab: string) => {
     switch (tab) {
       case 'checkout':
-        navigate('/transactions/checkout');
+        navigate('/app/transactions/checkout');
         break;
       case 'active':
-        navigate('/transactions/active');
+        navigate('/app/transactions/active');
         break;
       case 'history':
-        navigate('/transactions/history');
+        navigate('/app/transactions/history');
         break;
     }
   };

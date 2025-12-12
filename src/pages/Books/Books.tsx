@@ -85,7 +85,7 @@ const Books = () => {
           <p className="text-gray-600">Manage your library's book collection</p>
         </div>
         <button
-          onClick={() => navigate("/AddBook")}
+          onClick={() => navigate("/app/AddBook")}
           className="bg-[#3D89D6] hover:bg-[#326bb0] text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition"
         >
           + Add Book

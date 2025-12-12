@@ -120,7 +120,7 @@ const Students = () => {
           <p className="text-gray-600">Manage library members and borrowing status</p>
         </div>
         <button
-          onClick={() => navigate("/addstudent")}
+          onClick={() => navigate("/app/addstudent")}
           className="bg-[#3D89D6] hover:bg-[#326bb0] text-white px-6 py-3 rounded-lg font-medium transition"
         >
           + Add Member

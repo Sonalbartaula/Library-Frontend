@@ -13,7 +13,7 @@ export default function Sidebar() {
       <div className="flex flex-col justify-between h-full mt-6 px-6">
           <nav className="flex flex-col gap-3">
         <NavLink
-          to="/dashboard"
+          to="/app/dashboard"
           className={({ isActive }) =>
             `flex items-center gap-3 p-3 rounded-xl hover:bg-[#3D89D6] hover:text-white transition ${
               isActive ? "bg-[#3D89D6] text-white" : ""
@@ -24,7 +24,7 @@ export default function Sidebar() {
         </NavLink>
 
         <NavLink
-          to="/transactions"
+          to="/app/transactions"
           className={({ isActive }) =>
             `flex items-center gap-3 p-3 rounded-xl hover:bg-[#3D89D6] hover:text-white transition ${
               isActive ? "bg-[#3D89D6]  text-white" : ""
@@ -35,7 +35,7 @@ export default function Sidebar() {
         </NavLink>
 
         <NavLink
-          to="/books"
+          to="/app/books"
           className={({ isActive }) =>
             `flex items-center gap-3 p-3 rounded-xl hover:bg-[#3D89D6] hover:text-white transition ${
               isActive ? "bg-[#3D89D6]  text-white" : ""
@@ -46,7 +46,7 @@ export default function Sidebar() {
         </NavLink>
 
         <NavLink
-          to="/students"
+          to="/app/students"
           className={({ isActive }) =>
             `flex items-center gap-3 p-3 rounded-xl hover:bg-[#3D89D6] hover:text-white transition ${
               isActive ? "bg-[#3D89D6]  text-white" : ""
@@ -57,7 +57,7 @@ export default function Sidebar() {
         </NavLink>
 
         <NavLink
-          to="/reports"
+          to="/app/reports"
           className={({ isActive }) =>
             `flex items-center gap-3 p-3 rounded-xl hover:bg-[#3D89D6] hover:text-white transition ${
               isActive ? "bg-[#3D89D6]  text-white" : ""

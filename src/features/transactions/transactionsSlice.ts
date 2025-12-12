@@ -1,12 +1,5 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-
-import {
-  checkoutBook,
-  returnBook,
-  renewBook,
-  fetchActiveLoans,
-  fetchHistory
-} from './transactionsThunk';
+import { createSlice } from '@reduxjs/toolkit';
+import { checkoutBook, returnBook, renewBook, fetchActiveLoans, fetchHistory } from './transactionsThunk';
 import type { Transaction } from './model';
 
 interface TransactionsState {
@@ -29,100 +22,89 @@ const transactionsSlice = createSlice({
   name: 'transactions',
   initialState,
   reducers: {
-    clearError(state) {
+    clearError: (state) => {
       state.error = null;
     },
-    clearSuccessMessage(state) {
+    clearSuccessMessage: (state) => {
       state.successMessage = null;
-    }
+    },
   },
   extraReducers: (builder) => {
+    // Checkout
     builder
-      // Checkout book
       .addCase(checkoutBook.pending, (state) => {
         state.loading = true;
         state.error = null;
-        state.successMessage = null;
       })
-      .addCase(checkoutBook.fulfilled, (state, action: PayloadAction<Transaction>) => {
+      .addCase(checkoutBook.fulfilled, (state) => {
         state.loading = false;
-        state.activeLoans.unshift(action.payload);
         state.successMessage = 'Book checked out successfully!';
       })
       .addCase(checkoutBook.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || 'Failed to checkout book';
-      })
+        state.error = action.payload as string || 'Failed to checkout book';
+      });
 
-      // Return book
+    // Return Book
+    builder
       .addCase(returnBook.pending, (state) => {
         state.loading = true;
         state.error = null;
-        state.successMessage = null;
       })
-      .addCase(returnBook.fulfilled, (state, action: PayloadAction<Transaction>) => {
+      .addCase(returnBook.fulfilled, (state) => {
         state.loading = false;
-        // Remove from active loans
-        state.activeLoans = state.activeLoans.filter(
-          loan => loan.isbn !== action.payload.isbn
-        );
-        // Add to history
-        state.history.unshift(action.payload);
         state.successMessage = 'Book returned successfully!';
       })
       .addCase(returnBook.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || 'Failed to return book';
-      })
+        state.error = action.payload as string || 'Failed to return book';
+      });
 
-      // Renew book
+    // Renew Book
+    builder
       .addCase(renewBook.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(renewBook.fulfilled, (state, action: PayloadAction<Transaction>) => {
+      .addCase(renewBook.fulfilled, (state) => {
         state.loading = false;
-        const index = state.activeLoans.findIndex(
-          loan => loan.isbn === action.payload.isbn
-        );
-        if (index !== -1) {
-          state.activeLoans[index] = action.payload;
-        }
         state.successMessage = 'Book renewed successfully!';
       })
       .addCase(renewBook.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || 'Failed to renew book';
-      })
+        state.error = action.payload as string || 'Failed to renew book';
+      });
 
-      // Fetch active loans
+    // Fetch Active Loans
+    builder
       .addCase(fetchActiveLoans.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchActiveLoans.fulfilled, (state, action: PayloadAction<Transaction[]>) => {
+      .addCase(fetchActiveLoans.fulfilled, (state, action) => {
         state.loading = false;
         state.activeLoans = action.payload;
       })
       .addCase(fetchActiveLoans.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || 'Failed to fetch active loans';
-      })
+        state.error = action.payload as string || 'Failed to fetch active loans';
+      });
 
-      // Fetch history
+    // Fetch History
+    builder
       .addCase(fetchHistory.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchHistory.fulfilled, (state, action: PayloadAction<Transaction[]>) => {
+      .addCase(fetchHistory.fulfilled, (state, action) => {
         state.loading = false;
         state.history = action.payload;
       })
       .addCase(fetchHistory.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || 'Failed to fetch transaction history';
+        state.error = action.payload as string || 'Failed to fetch history';
       });
-  }
+  },
 });
 
 export const { clearError, clearSuccessMessage } = transactionsSlice.actions;
