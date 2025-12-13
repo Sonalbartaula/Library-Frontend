@@ -13,17 +13,17 @@ export const transactionsRepository = {
     return response.data;
   },
 
-async returnBook(isbn: string): Promise<Transaction> {
-  const response = await api.put<Transaction>(
-    `${BASE_URL}/Return/${isbn}`,
-    { } // send in body
-  );
-  return response.data;
-},
-
-  async renewBook(isbn: string): Promise<Transaction> {
+ async returnBook(transactionId: number): Promise<Transaction> {
     const response = await api.put<Transaction>(
-      `${BASE_URL}/Renew/${isbn}`,
+      `${BASE_URL}/Return/${transactionId}`,
+      {}
+    );
+    return response.data;
+  },
+
+  async renewBook(transactionId: number): Promise<Transaction> {
+    const response = await api.put<Transaction>(
+      `${BASE_URL}/Renew/${transactionId}`,
       {}
     );
     return response.data;

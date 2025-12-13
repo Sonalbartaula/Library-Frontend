@@ -5,7 +5,7 @@ export interface CheckoutRequest {
 }
 
 export interface Transaction {
-  id: string;
+  id: number;
   memberName: string;
   memberNumber: string;
   bookTitle: string;

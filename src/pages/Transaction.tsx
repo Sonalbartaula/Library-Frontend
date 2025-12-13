@@ -4,10 +4,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Book, Clock, AlertTriangle, Search, FileText } from 'lucide-react';
 import {
   checkoutBook,
-  returnBook,
   renewBook,
   fetchActiveLoans,
-  fetchHistory
+  fetchHistory,
+  returnBook
 } from '../features/transactions/transactionsThunk';
 import { clearError, clearSuccessMessage } from '../features/transactions/transactionsSlice';
 import type { RootState, AppDispatch } from '../features/store';
@@ -19,7 +19,6 @@ const BookCheckout: React.FC = () => {
 
   const [memberId, setMemberId] = useState('');
   const [bookIsbn, setBookIsbn] = useState('');
-  const [action, setAction] = useState('Book Checkout');
 
   useEffect(() => {
     return () => {
@@ -28,17 +27,16 @@ const BookCheckout: React.FC = () => {
     };
   }, [dispatch]);
 
- const handleProcessTransaction = async () => {
-  dispatch(clearError());
-  dispatch(clearSuccessMessage());
+  const handleProcessTransaction = async () => {
+    dispatch(clearError());
+    dispatch(clearSuccessMessage());
 
-  if (!memberId.trim() || !bookIsbn.trim()) {
-    alert('Please enter both Member ID and Book ISBN');
-    return;
-  }
+    if (!memberId.trim() || !bookIsbn.trim()) {
+      alert('Please enter both Member ID and Book ISBN');
+      return;
+    }
 
-  try {
-    if (action === 'Book Checkout') {
+    try {
       const result = await dispatch(checkoutBook({
         memberName: memberId.trim(),
         bookTitle: bookIsbn.trim(),
@@ -46,34 +44,18 @@ const BookCheckout: React.FC = () => {
       })).unwrap();
       
       console.log('Checkout successful:', result);
-    } else { 
-      // Book Return - FIXED: Added .unwrap()
-      const result = await dispatch(returnBook({ 
-        isbn: bookIsbn.trim(), 
-        memberName: memberId.trim() 
-      })).unwrap();
       
-      console.log('Return successful:', result);
+      // Common cleanup
+      setMemberId('');
+      setBookIsbn('');
+      dispatch(fetchActiveLoans());
+    } catch (err: any) {
+      console.error('Transaction error:', err);
+      if (!error) {
+        alert(err?.message || err || 'Transaction failed. Please try again.');
+      }
     }
-    
-    // Common cleanup after both actions
-    setMemberId('');
-    setBookIsbn('');
-    dispatch(fetchActiveLoans());
-    
-    // Refresh history only for returns
-    if (action === 'Book Return') {
-      dispatch(fetchHistory());
-    }
-  } catch (err: any) {
-    console.error('Transaction error:', err);
-    // Error will be shown in the error banner automatically
-    // But also show alert for immediate feedback
-    if (!error) {
-      alert(err?.message || err || 'Transaction failed. Please try again.');
-    }
-  }
-};
+  };
 
   const handleResetForm = () => {
     setMemberId('');
@@ -93,8 +75,8 @@ const BookCheckout: React.FC = () => {
       <div className="flex items-start gap-2 mb-2">
         <Book className="w-6 h-6 mt-1" />
         <div>
-          <h2 className="text-2xl font-bold">New Book Transaction</h2>
-          <p className="text-gray-500 mt-1">Issue or return books to library members</p>
+          <h2 className="text-2xl font-bold">New Book Checkout</h2>
+          <p className="text-gray-500 mt-1">Issue books to library members</p>
         </div>
       </div>
 
@@ -142,21 +124,6 @@ const BookCheckout: React.FC = () => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Action
-            </label>
-            <select
-              value={action}
-              onChange={(e) => setAction(e.target.value)}
-              disabled={loading}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-              <option>Book Checkout</option>
-              <option>Book Return</option>
-            </select>
-          </div>
-
           <div className="flex gap-3 pt-4">
             <button
               onClick={handleProcessTransaction}
@@ -165,7 +132,7 @@ const BookCheckout: React.FC = () => {
                 loading || !memberId.trim() || !bookIsbn.trim() ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
-              {loading ? 'Processing...' : 'Process Transaction'}
+              {loading ? 'Processing...' : 'Checkout Book'}
             </button>
             <button
               onClick={handleResetForm}
@@ -200,7 +167,8 @@ const ActiveLoans: React.FC = () => {
 
   const [searchActive, setSearchActive] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
-  const [renewLoading, setRenewLoading] = useState<string | null>(null);
+  const [renewLoading, setRenewLoading] = useState<number | null>(null);
+  const [returnLoading, setReturnLoading] = useState<number | null>(null);
 
   useEffect(() => {
     dispatch(fetchActiveLoans());
@@ -227,24 +195,49 @@ const ActiveLoans: React.FC = () => {
     return filtered;
   }, [activeLoans, searchActive, statusFilter]);
 
-  const handleRenew = async (isbn: string) => {
+  const handleReturn = async (transactionId: number) => {
     dispatch(clearError());
     dispatch(clearSuccessMessage());
     
+    if (!window.confirm('Are you sure you want to return this book?')) {
+      return;
+    }
+    
     try {
-      setRenewLoading(isbn);
-      const result = await dispatch(renewBook(isbn)).unwrap();
-      console.log('Renew successful:', result);
-      alert('Book renewed successfully!');
+      setReturnLoading(transactionId);
+      const result = await dispatch(returnBook(transactionId)).unwrap();
+      console.log('Return successful:', result);
+      alert('Book returned successfully!');
       await dispatch(fetchActiveLoans());
+      await dispatch(fetchHistory()); // Refresh history too
     } catch (err: any) {
-      console.error('Renew error:', err);
-      const errorMessage = err?.message || err || 'Failed to renew book. Please try again.';
+      console.error('Return error:', err);
+      const errorMessage = err?.message || err || 'Failed to return book. Please try again.';
       alert(errorMessage);
     } finally {
-      setRenewLoading(null);
+      setReturnLoading(null);
     }
   };
+
+
+  const handleRenew = async (transactionId: number) => {  
+  dispatch(clearError());
+  dispatch(clearSuccessMessage());
+  
+  try {
+    setRenewLoading(transactionId);  
+    const result = await dispatch(renewBook(transactionId)).unwrap();  
+    console.log('Renew successful:', result);
+    alert('Book renewed successfully!');
+    await dispatch(fetchActiveLoans());
+  } catch (err: any) {
+    console.error('Renew error:', err);
+    const errorMessage = err?.message || err || 'Failed to renew book. Please try again.';
+    alert(errorMessage);
+  } finally {
+    setRenewLoading(null);
+  }
+};
 
   const parseDaysLeft = (timeLeftStr: string): number => {
     if (!timeLeftStr) return 0;
@@ -402,13 +395,21 @@ const ActiveLoans: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-4 px-4 text-center">
+                       <button
+                        onClick={() => handleReturn(loan.id)}
+                        disabled={returnLoading === loan.id || loan.computedStatus === 'Returned'}
+                        className="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        title={loan.computedStatus === 'Returned' ? 'Already returned' : 'Return this book'}
+                      >
+                        {returnLoading === loan.id ? 'Returning...' : 'Return'}
+                      </button>
                       <button
-                        onClick={() => handleRenew(loan.isbn)}
-                        disabled={renewLoading === loan.isbn || loan.computedStatus === 'Returned'}
+                        onClick={() => handleRenew(loan.id)}
+                        disabled={renewLoading === loan.id || loan.computedStatus === 'Returned'}
                         className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition"
                         title={loan.computedStatus === 'Returned' ? 'Cannot renew returned books' : 'Renew this loan'}
                       >
-                        {renewLoading === loan.isbn ? 'Renewing...' : 'Renew'}
+                        {renewLoading === loan.id ? 'Renewing...' : 'Renew'}
                       </button>
                     </td>
                   </tr>

@@ -10,17 +10,17 @@ export const checkoutBook = createAsyncThunk<Transaction, CheckoutRequest>(
   }
 );
 
-export const returnBook = createAsyncThunk<Transaction, { isbn: string; memberName: string }>(
+export const returnBook = createAsyncThunk<Transaction, number>(
   'transactions/return',
-  async ({ isbn}) => {
-    return await transactionsRepository.returnBook(isbn);
+  async (transactionId) => {
+    return await transactionsRepository.returnBook(transactionId);
   }
 );
 
-export const renewBook = createAsyncThunk<Transaction, string>(
+export const renewBook = createAsyncThunk<Transaction, number>(
   'transactions/renew',
-  async (isbn) => {
-    return await transactionsRepository.renewBook(isbn);
+  async (transactionId) => {
+    return await transactionsRepository.renewBook(transactionId);
   }
 );
 
